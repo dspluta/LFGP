@@ -24,7 +24,7 @@ def initiate_factors(Y, latent_dim):
 	return F
 
 
-def gibbs_sampling(F, Y, verbose=True):
+def gibbs_sampling(F, Y, gprior_params=(10, 0.1), verbose=True):
 	""" 
 	One Gibbs sampling step to update everything else given F then draw from conditional of F.
 	"""
@@ -41,7 +41,7 @@ def gibbs_sampling(F, Y, verbose=True):
 	covs = []
 	gp_traces = []
 	for j in range(latent_dim):
-		cov, gp_trace = sample_gp_posterior(F[:, j], test=True)
+		cov, gp_trace = sample_gp_posterior(F[:, j], gprior_params=gprior_params, test=True)
 		covs.append(cov)
 		gp_traces.append(gp_trace)
 	S1, S2, S3, S4 = build_covariance_blocks(covs, loading_matrix, Y_variance)
