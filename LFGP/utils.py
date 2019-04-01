@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import gamma, cauchy
+from scipy.linalg import logm
 
 
 def l_gamma_prior(l, a, b):
@@ -38,3 +39,23 @@ def reshape_latent_curves(F, n, t):
             F_curves[:, i] = F[(i * t):(i * t + t), j]
         F_curves_list.append(F_curves)
     return F_curves_list
+
+
+def sliding_window(time_series, size=50, stride=1):
+    """
+    Calculate sliding window covariance Log-Euclidean vector time series.
+
+    Args
+        time_series: (numpy array) [t, n] t observations in time of n dimensional data
+        size: (int) sliding window size
+        stride: (int) sliding step size
+    """
+    t, n = time_series.shape
+    # cov_series = np.zeros((t - size, n, n))
+    log_series = np.zeros((int((t - size) / stride), int(0.5 * n * (n + 1))))
+    for i in range(int((t - size) / stride)):
+        window = time_series[(i * stride):(i * stride + size), :]
+        cov = np.cov(window, rowvar=False)
+        # cov_series[i, :, :] = cov
+        log_series[i, :] = logm(cov)[np.triu_indices(n)]
+    return log_series
