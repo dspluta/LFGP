@@ -1,5 +1,3 @@
-# LFGP
-
 ## LFGP
 
 source code for the model
