@@ -23,7 +23,7 @@ def propose(current, std):
     return value
 
 
-def calculate_p(l, s, Y, x, prior_params):
+def calculate_p_deprecated(l, s, Y, x, prior_params):
     """
     Calculate log prior and likelihood of n independent Gaussian processes (Y has shape [t, n])
     """
@@ -33,6 +33,20 @@ def calculate_p(l, s, Y, x, prior_params):
     for j in range(Y.shape[1]):
         loglik += np.log(gp_marginal_likelihood(Y[:, j], x, l, s))  # independent observations
     return np.log(prior) + loglik
+
+
+def calculate_p(l, s, Y, x, prior_params):
+    a, b, scale = prior_params
+    prior = l_gamma_prior(l, a, b)  # * s_half_cauchy_prior(s, scale)
+    t, n = Y.shape
+    cov = kernel_covariance(x, l, s)
+    inverse = np.linalg.inv(cov)
+    loglik = 0.0
+    sign, logdet = np.linalg.slogdet(cov)
+    constant = -0.5 * logdet - 0.5 * t * np.log(2 * np.pi)
+    for j in range(Y.shape[1]):
+        loglik += -0.5 * np.matmul(np.matmul(Y[:, j].reshape((1, t)), inverse), Y[:, j].reshape((t, 1)))[0][0] + constant
+    return loglik + np.log(prior)
 
 
 def accept_new(accept_prob):

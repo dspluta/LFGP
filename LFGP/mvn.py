@@ -41,7 +41,43 @@ def build_covariance_blocks(F_covariance_list, loading_matrix, Y_variance):
     return block_FF, block_FY, block_YF, block_YY
 
 
-def sample_conditional_F(Y, blocks, return_cov=False):
+def factor_covariance_blocks(F_covariance_list, loading_matrix, Y_variance, factor_index):
+    """
+    Build covariance matrix for long vector of all columns of Y stacked together.
+
+    Args
+        F_covariance_list: (list) of [t, t] covariance matrices
+        loading_matrix: (numpy array) [r, q] linear transformation between F and Y
+        Y_sigma_list: (numpy array) [q] variance parameters for columns of Y
+    """
+    r = len(F_covariance_list)
+    t = F_covariance_list[0].shape[0]
+    q = loading_matrix.shape[1]
+    block_YY = np.zeros((q * t, q * t))
+    # covariance for columns of F
+    block_FF = F_covariance_list[factor_index]
+    # covariance between columns of F and columns of Y
+    block_FY_rows = []
+    current_row = np.zeros((t, q * t))
+    for j in range(q):
+        current_row[:, (j * t):(j * t + t)] = loading_matrix[factor_index, j] * F_covariance_list[factor_index]
+    block_FY = current_row
+    block_YF = np.transpose(block_FY)
+    # covariance between columns of Y
+    block_YY_rows = []
+    for i in range(q):
+        current_row = np.zeros((t, q * t))
+        for j in range(q):
+            current_row[:, (j * t):(j * t + t)] += F_covariance_list[factor_index] \
+                                                   * loading_matrix[factor_index, i] * loading_matrix[factor_index, j]
+            if i == j:
+                current_row[:, (j * t):(j * t + t)] += np.eye(t) * Y_variance[i]  # diagonal variance
+        block_YY_rows.append(current_row)
+    block_YY = np.vstack(block_YY_rows)
+    return block_FF, block_FY, block_YF, block_YY
+
+
+def sample_conditional_F(Y, F_covariance_list, loading_matrix, Y_variance):
     """
     Sample from conditional distribution of F given everything else.
 
@@ -49,7 +85,7 @@ def sample_conditional_F(Y, blocks, return_cov=False):
         Y: (numpy array) [t, q] observed multivariate time series
         block_FF, block_FY, block_YF, block_YY: (numpy array) blocks in the covariance of joint distribution
     """
-    block_FF, block_FY, block_YF, block_YY = blocks
+    block_FF, block_FY, block_YF, block_YY = build_covariance_blocks(F_covariance_list, loading_matrix, Y_variance)
     t, q = Y.shape
     r = int(block_FF.shape[0] / t)
     Y_stack = np.transpose(Y).reshape(t * q)  # stack columns of Y
@@ -59,7 +95,42 @@ def sample_conditional_F(Y, blocks, return_cov=False):
     covariance = block_FF - np.matmul(prod, block_YF)
     F_stack = np.random.multivariate_normal(mu, covariance)
     F_sample = np.transpose(F_stack.reshape((r, t)))  # de-stack columns of F
-    if return_cov:
-        return F_sample, covariance
-    else:
-        return F_sample
+    return F_sample
+
+
+def conditional_F_dist(F_covariance_list, loading_matrix, Y_variance):
+    block_FF, block_FY, block_YF, block_YY = build_covariance_blocks(F_covariance_list, loading_matrix, Y_variance)
+    block_YY_inverse = np.linalg.inv(block_YY)
+    prod = np.matmul(block_FY, block_YY_inverse)
+    covariance = block_FF - np.matmul(prod, block_YF)
+    return prod, covariance
+
+
+def sample_conditonal_F_dist(Y, prod, covariance):
+    t, q = Y.shape
+    r = int(covariance.shape[0] / t)
+    Y_stack = np.transpose(Y).reshape(t * q)  # stack columns of Y
+    mu = np.matmul(prod, Y_stack)
+    F_stack = np.random.multivariate_normal(mu, covariance)
+    F_sample = np.transpose(F_stack.reshape((r, t)))  # de-stack columns of F
+    return F_sample
+
+
+def iterative_conditional_F(Y, F_covariance_list, loading_matrix, Y_variance):
+    r = len(F_covariance_list)
+    t, q = Y.shape
+    Y_stack = np.transpose(Y).reshape(t * q)  # stack columns of Y
+    residuals = Y_stack.copy()
+    F_stack = np.zeros(t * r)
+    for i in range(r):
+        block_FF, block_FY, block_YF, block_YY = factor_covariance_blocks(F_covariance_list, loading_matrix, Y_variance, i)
+        block_YY_inverse = np.linalg.inv(block_YY)
+        prod = np.matmul(block_FY, block_YY_inverse)
+        mu = np.matmul(prod, residuals)
+        covariance = block_FF - np.matmul(prod, block_YF)
+        conditional = np.random.multivariate_normal(mu, covariance)
+        F_stack[(i * t):(i * t + t)] = conditional
+        hat = np.matmul(conditional.reshape((t, 1)), loading_matrix[i, :].reshape((1, q)))
+        residuals = residuals - np.transpose(hat).reshape(t * q)
+    F_sample = np.transpose(F_stack.reshape((r, t)))  # de-stack columns of F
+    return F_sample
