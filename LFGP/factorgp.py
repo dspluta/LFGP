@@ -1,5 +1,5 @@
 import numpy as np
-from mvn import sample_conditional_F, iterative_conditional_F, conditional_F_dist, sample_conditonal_F_dist
+from mvn import *
 from utils import kernel_covariance
 
 
@@ -76,8 +76,13 @@ class IterFactorGP:
         for l in self.theta:
             covs.append(kernel_covariance(self.x, l, 1.0))
         F = np.zeros((n * t, r))
-        for i in range(n):  # sample from F conditional distribution for each epoch independently
-            F[(i * t):(i * t + t), :] = iterative_conditional_F(Y[(i * t):(i * t + t), :], covs, self.loading, self.variance)
+        residuals = Y.copy()
+        for j in range(r):  # update factors iteratively
+            prod, covariance = conditional_factor_dist(covs, self.loading, self.variance, j)
+            for i in range(n):  # sample from F conditional distribution for each epoch independently
+                F[(i * t):(i * t + t), j] = sample_conditonal_factor_dist(residuals[(i * t):(i * t + t), :], prod, covariance)
+            hat = np.matmul(F[:, j].reshape((n * t, 1)), self.loading[j, :].reshape((1, q)))
+            residuals = residuals - hat
         self.F = F
 
     def predict(self):
