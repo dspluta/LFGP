@@ -117,6 +117,9 @@ def sample_conditonal_F_dist(Y, prod, covariance):
 
 
 def iterative_conditional_F(Y, F_covariance_list, loading_matrix, Y_variance):
+    """
+    Sample conditional distribution of F by each factor as iterative regression.
+    """
     r = len(F_covariance_list)
     t, q = Y.shape
     Y_stack = np.transpose(Y).reshape(t * q)  # stack columns of Y
@@ -154,6 +157,9 @@ def sample_conditonal_factor_dist(res, prod, covariance):
 
 
 def kronecker_A(loading_matrix, factor_index):
+    """
+    Covariance between columns of Y with respect to a specific factor.
+    """
     r, q = loading_matrix.shape
     A = np.zeros((q, q))
     for i in range(q):
@@ -163,6 +169,9 @@ def kronecker_A(loading_matrix, factor_index):
 
 
 def quick_inverse(A, cov, Y_variance):
+    """
+    Calculate inverse of the sum of kronecker product and identity matrix.
+    """
     q = A.shape[0]
     t = cov.shape[0]
     var = np.zeros(q * t)

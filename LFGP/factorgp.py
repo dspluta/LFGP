@@ -34,7 +34,7 @@ class FactorGP:
         covs = []
         for l in self.theta:
             covs.append(kernel_covariance(self.x, l, 1.0))
-        prod, covariance = conditional_F_dist(covs, self.loading, self.variance)
+        prod, covariance = conditional_F_dist(covs, self.loading, self.variance)  # only invert covariance once
         F = np.zeros((n * t, r))
         for i in range(n):  # sample from F conditional distribution for each epoch independently
             F[(i * t):(i * t + t), :] = sample_conditonal_F_dist(Y[(i * t):(i * t + t), :], prod, covariance)
@@ -46,10 +46,7 @@ class FactorGP:
 
 class IterFactorGP:
     """
-    Latent factor Gaussian process model for multivariate time series
-    Data: n epochs, t time points, q dimensional, r latent factors
-    Parameters: loading matrix (r x q), variance vector (q), length scale (r)
-    Priors: Conjugate Normal, inverse-Gamma, and Gamma (needs to be informative)
+    Update latent factors iteratively.
     """
 
     def __init__(self, dims, mu_var=[0, 1], inverse_gamma=[1, 1], gamma=[10, 1], F=None):
